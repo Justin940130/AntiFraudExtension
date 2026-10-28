@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Anti-Fraud Messaging Alert",
+  "version": "1.0",
+  "description": "即時偵測網頁版通訊軟體的高風險詐騙訊息",
+  "content_scripts": [
+    {
+      "matches": ["*://web.line.me/*", "*://www.messenger.com/*", "*://web.whatsapp.com/*", "*://www.instagram.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
