@@ -1,6 +1,8 @@
 
 import sqlite3
 import hashlib
+import json
+from contextlib import closing
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -17,7 +19,7 @@ def get_hash(text):
 
 
 def init_db():
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+    with closing(sqlite3.connect(DB_PATH, timeout=10)) as conn, conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS analysis_cache (
                 message_hash TEXT PRIMARY KEY,
@@ -28,14 +30,31 @@ def init_db():
                 analyzed_at TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS context_cache (
+                message_hash TEXT PRIMARY KEY,
+                result_json TEXT NOT NULL
+            )
+        """)
 
-    print("SQLite 資料庫已初始化")
+
+def get_context_result(key):
+    with closing(sqlite3.connect(DB_PATH, timeout=10)) as conn:
+        row = conn.execute("SELECT result_json FROM context_cache WHERE message_hash = ?", (key,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def save_context_result(key, result):
+    # Evidence is represented by offsets. The conversation text stays out of SQLite.
+    with closing(sqlite3.connect(DB_PATH, timeout=10)) as conn, conn:
+        conn.execute("INSERT OR REPLACE INTO context_cache VALUES (?, ?)", (key, json.dumps(result)))
+
 
 
 def get_cached_result(text):
     message_hash = get_hash(text)
 
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+    with closing(sqlite3.connect(DB_PATH, timeout=10)) as conn, conn:
         row = conn.execute("""
             SELECT risk_level, category
             FROM analysis_cache
@@ -57,7 +76,7 @@ def save_result(text, risk_level, category, latency_ms):
 
     message_hash = get_hash(text)
 
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+    with closing(sqlite3.connect(DB_PATH, timeout=10)) as conn, conn:
         conn.execute("""
             INSERT OR REPLACE INTO analysis_cache
             (message_hash, risk_level, category,
